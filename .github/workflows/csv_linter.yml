@@ -3,6 +3,7 @@ name: CSV Linter and Trailing Whitespaces
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   lint_and_check_trailing_whitespaces:
