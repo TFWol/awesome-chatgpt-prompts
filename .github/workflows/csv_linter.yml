@@ -17,18 +17,24 @@ jobs:
         python -m pip install csvkit
 
     - name: Lint CSV files
-      run: find . -name "*.csv" -exec csvlint -u 2 {} \\; > csvlint_output.txt 2>&1
+      run: find . -name "*.csv" -exec csvclean -n -u 2 {} +
       env:
         CI: true
     - name: Check for errors
       if: always()
       run: |
-        if grep -v "No errors." csvclean_output.txt; then
-          echo "Errors were found in one or more CSV files (possibly including quote issues):"
-          cat csvclean_output.txt
+        if ! grep -q "No errors." <(find . -name "*.csv" -exec csvclean -n -u 2 {} + | grep -v "^$"); then
+          echo "Errors were found in one or more CSV files."
+          exit 1
+        fi
+    - name: Check for double quote errors
+      run: |
+        if find . -name "*.csv" -exec csvclean -n -q {} + | grep -q "quoting"; then
+          echo "Double quote errors found in one or more CSV files."
+          find . -name "*.csv" -exec csvclean -n -q {} +
           exit 1
         else
-          echo "No errors found in CSV files."
+          echo "No double quote errors found."
         fi
     - name: Check Trailing Whitespaces
       run: |
