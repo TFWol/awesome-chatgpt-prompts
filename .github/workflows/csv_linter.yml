@@ -16,32 +16,38 @@ jobs:
       run: |
         python -m pip install csvkit
 
-    - name: Lint CSV files
-      run: find . -name "*.csv" -exec csvclean -u 2 {} +
-      env:
-        CI: true
-    - name: Check for errors
-      if: always()
+    - name: Lint CSV files and check for errors
       run: |
-        if ! grep -q "No errors." <(find . -name "*.csv" -exec csvclean -u 2 {} + | grep -v "^$"); then
+        errors_found=false
+        while IFS= read -r -d '' file; do
+          echo "Checking $file"
+          if csvclean -n --enable-all-checks "$file" 2>&1 | grep -q "Error:"; then
+            echo "Errors found in $file"
+            csvclean -n --enable-all-checks "$file"
+            errors_found=true
+          fi
+        done < <(find . -name "*.csv" -print0)
+        
+        if [ "$errors_found" = true ]; then
           echo "Errors were found in one or more CSV files."
           exit 1
-        fi
-    - name: Check for double quote errors
-      run: |
-        if find . -name "*.csv" -exec csvclean -u 2 -q {} + | grep -q "quoting"; then
-          echo "Double quote errors found in one or more CSV files."
-          find . -name "*.csv" -exec csvclean -u -q {} +
-          exit 1
         else
-          echo "No double quote errors found."
+          echo "No errors found in CSV files."
         fi
+
     - name: Check Trailing Whitespaces
       run: |
-        # Check if the special file contains any trailing whitespaces
-        if grep -q "[[:space:]]$" ./prompts.csv; then
-          echo "ERROR: Found trailing whitespaces in prompts.csv"
+        trailing_spaces_found=false
+        while IFS= read -r -d '' file; do
+          if grep -q "[[:space:]]$" "$file"; then
+            echo "ERROR: Found trailing whitespaces in $file"
+            trailing_spaces_found=true
+          fi
+        done < <(find . -name "*.csv" -print0)
+        
+        if [ "$trailing_spaces_found" = true ]; then
+          echo "Trailing whitespaces found in one or more CSV files."
           exit 1
         else
-          echo "No trailing whitespaces found in prompts.csv"
+          echo "No trailing whitespaces found in CSV files."
         fi
